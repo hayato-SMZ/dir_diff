@@ -1,6 +1,8 @@
 use core::panic;
 use sha2::{Digest, Sha256};
-use std::fs;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::{Path, PathBuf};
 pub struct FileInfomation {
     pub path: String,
     pub full_path: String,
@@ -29,20 +31,23 @@ impl FileInfomation {
     pub fn set_path(&mut self, base_path: String, full_path: String) {
         self.full_path = full_path.clone();
         self.path = full_path.replace(&base_path, "");
-        let filebinary = fs::read_to_string(full_path);
-        match filebinary {
-            Ok(filedata) => {
-                let mut hasher = Sha256::new();
-                hasher.update(filedata);
-                self.file_hash = format!("{:X}", hasher.finalize());
-                let mut path_hasher = Sha256::new();
-                path_hasher.update(&self.path);
-                self.path_hash = format!("{:X}", path_hasher.finalize());
-            }
-            Err(_) => {
-                panic!("file load error!");
-            }
-        }
+        let mut target_path = Path::new(&full_path);
+        let mut file = match File::open(&target_path) {
+            Ok(file) => file,
+            Err(why) => panic!("can't open {}", why),
+        };
+
+        let mut s = String::new();
+        let file_str = match file.read_to_string(&mut s) {
+            Err(why) => panic!("cant read {}", why),
+            Ok(file_str) => file_str,
+        };
+        let mut hasher = Sha256::new();
+        hasher.update(s);
+        self.file_hash = format!("{:X}", hasher.finalize());
+        let mut path_hasher = Sha256::new();
+        path_hasher.update(&self.path);
+        self.path_hash = format!("{:X}", path_hasher.finalize());
     }
 
     pub fn get_path_hash(self) -> String {
@@ -54,65 +59,94 @@ impl FileInfomation {
     }
 
     pub fn compare(&mut self, target_file: String) -> bool {
-        let filebinary = fs::read_to_string(target_file);
-        match filebinary {
-            Ok(filedata) => {
-                let mut hasher = Sha256::new();
-                hasher.update(filedata);
-                let target_hash: String = format!("{:X}", hasher.finalize());
-                if &target_hash == &self.file_hash {
-                    self.compared = true;
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-            Err(_) => return false,
+        let full = Path::new(&target_file);
+        let mut file = match File::open(target_file) {
+            Ok(file) => file,
+            Err(why) => panic!("can't open {}", why),
         };
+
+        let mut s = String::new();
+        match file.read_to_string(&mut s) {
+            Err(why) => panic!("cant read {}", why),
+            Ok(file_str) => file_str,
+        };
+        let mut hasher = Sha256::new();
+        hasher.update(s);
+        let target_hash: String = format!("{:X}", hasher.finalize());
+        if &target_hash == &self.file_hash {
+            self.compared = true;
+            return true;
+        }
+
+        return false;
+        // match filebinary {
+        //     Ok(filedata) => {
+        //         let mut hasher = Sha256::new();
+        //         hasher.update(filedata);
+        //         let target_hash: String = format!("{:X}", hasher.finalize());
+        //         if &target_hash == &self.file_hash {
+        //             self.compared = true;
+        //             return true;
+        //         } else {
+        //             return false;
+        //         }
+        //     }
+        //     Err(_) => return false,
+        // };
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::diff_lib;
+    use std::env;
     #[test]
     fn test_set_path() {
         let mut info = diff_lib::file_infomation::FileInfomation::new();
+        let mut current = match env::current_dir() {
+            Ok(path) => path,
+            Err(_) => panic!("current is not found"),
+        };
+        current.push("test");
+        current.push("source");
+        let mut current_file = current.clone();
+        current_file.push("test.txt");
         info.set_path(
-            "/Users/hayatoshimizu/develop/private/rust/dir_diff/".to_string(),
-            "/Users/hayatoshimizu/develop/private/rust/dir_diff/Cargo.toml".to_string(),
+            format!("{}", current.display()),
+            format!("{}", current_file.display()),
         );
-        assert_eq!(info.path, "Cargo.toml");
+        assert_eq!(info.path, "/test.txt");
         println!("filehash => {}", info.file_hash);
         assert_eq!(
             info.file_hash,
-            "097D0017DD7BCB4799909D9983BA42AFCFE2548BF870A72179DBE76CCBBE2C01"
+            "8A5EC8575E94A85847DB04ABFCC8BB82D1191D79790527EEC2254B7DB1E64172"
         );
-        assert_eq!(
-            info.path_hash,
-            "2E9D962A08321605940B5A657135052FBCEF87B5E360662BB527C96D9A615542"
-        )
     }
 
     #[test]
     fn test_compare() {
         let mut info = diff_lib::file_infomation::FileInfomation::new();
+        let mut current = match env::current_dir() {
+            Ok(path) => path,
+            Err(_) => panic!("current is not found"),
+        };
+        current.push("test");
+        let mut current_file = current.clone();
+        let mut current_dir = current.clone();
+        let mut target_file = current.clone();
+        let mut error_file = current.clone();
+        current_file.push("source/test.txt");
+        current_dir.push("source");
+        target_file.push("target/test.txt");
+        error_file.push("target/word_sample.docx");
+        println!("error  =>   {}", current_file.display());
         info.set_path(
-            "/Users/hayatoshimizu/develop/private/rust/dir_diff/".to_string(),
-            "/Users/hayatoshimizu/develop/private/rust/dir_diff/Cargo.toml".to_string(),
-        );
-        assert_eq!(
-            info.compare(
-                "/Users/hayatoshimizu/develop/private/rust/dir_diff/Cargo.toml".to_string()
-            ),
-            true
+            format!("{}", current_dir.display()),
+            format!("{}", current_file.display()),
         );
 
-        assert_eq!(
-            info.compare(
-                "/Users/hayatoshimizu/develop/private/rust/dir_diff/Cargo.lock".to_string()
-            ),
-            false
-        );
+        assert_eq!(info.compare(format!("{}", target_file.display())), true);
+
+        assert_eq!(info.compare(format!("{}", error_file.display())), false);
     }
 }
