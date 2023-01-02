@@ -25,7 +25,8 @@ impl FileInfomation {
     pub fn new() -> FileInfomation {
         Default::default()
     }
-    fn set_path(&mut self, base_path: String, full_path: String) {
+
+    pub fn set_path(&mut self, base_path: String, full_path: String) {
         self.full_path = full_path.clone();
         self.path = full_path.replace(&base_path, "");
         let filebinary = fs::read_to_string(full_path);
@@ -43,13 +44,39 @@ impl FileInfomation {
             }
         }
     }
+
+    pub fn get_path_hash(self) -> String {
+        return self.path_hash;
+    }
+
+    pub fn get_path(self) -> String {
+        return self.path;
+    }
+
+    pub fn compare(&mut self, target_file: String) -> bool {
+        let filebinary = fs::read_to_string(target_file);
+        match filebinary {
+            Ok(filedata) => {
+                let mut hasher = Sha256::new();
+                hasher.update(filedata);
+                let target_hash: String = format!("{:X}", hasher.finalize());
+                if &target_hash == &self.file_hash {
+                    self.compared = true;
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            Err(_) => return false,
+        };
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::diff_lib;
     #[test]
-    fn set_path() {
+    fn test_set_path() {
         let mut info = diff_lib::file_infomation::FileInfomation::new();
         info.set_path(
             "/Users/hayatoshimizu/develop/private/rust/dir_diff/".to_string(),
@@ -64,6 +91,28 @@ mod tests {
         assert_eq!(
             info.path_hash,
             "2E9D962A08321605940B5A657135052FBCEF87B5E360662BB527C96D9A615542"
+        )
+    }
+
+    #[test]
+    fn test_compare() {
+        let mut info = diff_lib::file_infomation::FileInfomation::new();
+        info.set_path(
+            "/Users/hayatoshimizu/develop/private/rust/dir_diff/".to_string(),
+            "/Users/hayatoshimizu/develop/private/rust/dir_diff/Cargo.toml".to_string(),
+        );
+        assert_eq!(
+            info.compare(
+                "/Users/hayatoshimizu/develop/private/rust/dir_diff/Cargo.toml".to_string()
+            ),
+            true
+        );
+
+        assert_eq!(
+            info.compare(
+                "/Users/hayatoshimizu/develop/private/rust/dir_diff/Cargo.lock".to_string()
+            ),
+            false
         );
     }
 }
