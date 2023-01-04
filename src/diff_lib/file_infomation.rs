@@ -52,12 +52,7 @@ impl FileInfomation {
         self.full_path = full_path.clone();
         self.path = full_path.replace(&base_path, "");
         let mut target_path = Path::new(&full_path);
-        // let mut file = match File::open(&target_path) {
-        //     Ok(file) => file,
-        //     Err(why) => panic!("can't open {}", why),
-        // };
 
-        // self.file_hash = format!("{:X}", hasher.finish());
         self.file_hash = format!("{:X}", Self::calculate_hash(&target_path));
         let mut path_hasher = Sha256::new();
         path_hasher.update(&self.path);
