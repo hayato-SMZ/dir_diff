@@ -1,11 +1,15 @@
 use super::{file_infomation::FileInfomation, *};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::env;
+use std::fmt::format;
 use std::fs;
 use std::hash::Hash;
 use std::path::Path;
 pub struct ComparsionSource {
     pub base_path: String,
     pub file_list: HashMap<String, FileInfomation>,
+    pub compare_error: Vec<String>,
 }
 
 impl Default for ComparsionSource {
@@ -13,6 +17,7 @@ impl Default for ComparsionSource {
         Self {
             base_path: "".to_string(),
             file_list: HashMap::new(),
+            compare_error: Vec::new(),
         }
     }
 }
@@ -22,8 +27,19 @@ impl ComparsionSource {
         Default::default()
     }
 
-    pub fn set_base_path(&mut self, hash_path: String) {
-        self.base_path = hash_path;
+    pub fn set_base_path(&mut self, path: String) {
+        if Path::new(&path).exists() {
+            println!("path is exist");
+            self.base_path = path.clone();
+        } else {
+            println!("path is not exitst");
+            let mut current = match env::current_dir() {
+                Ok(path) => path,
+                Err(_) => panic!("current is not found"),
+            };
+            current.push(&path);
+            self.base_path = current.to_str().unwrap().to_string();
+        };
     }
 
     pub fn push_file_list(&mut self, file_path: &Path) {
@@ -45,6 +61,34 @@ impl ComparsionSource {
                 Self::read_target_directory(self, &path);
             } else {
                 Self::push_file_list(self, &path);
+            }
+        }
+    }
+
+    pub fn compare_start(&mut self, target_path: String) {
+        let path = Path::new(&target_path);
+        Self::compare_dir(self, path, &target_path);
+    }
+
+    pub fn compare_dir(&mut self, target_path: &Path, base_path: &String) {
+        let children = fs::read_dir(target_path).expect("compare dir read error");
+        for child in children {
+            let child = child.expect("dir entry error");
+            let path = child.path();
+            if path.is_dir() {
+                Self::compare_dir(self, &path, base_path);
+            } else {
+                let absolute_path = path.to_str().unwrap().replace(base_path, "");
+                let mut hasher = Sha256::new();
+                println!("absolute path => {}", absolute_path);
+                hasher.update(&absolute_path);
+                if !Self::compare(
+                    self,
+                    path.to_str().unwrap().to_string(),
+                    format!("{:X}", hasher.finalize()),
+                ) {
+                    self.compare_error.push(absolute_path);
+                }
             }
         }
     }
