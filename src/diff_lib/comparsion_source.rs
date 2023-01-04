@@ -1,6 +1,7 @@
 use super::{file_infomation::FileInfomation, *};
 use std::collections::HashMap;
 use std::fs;
+use std::hash::Hash;
 use std::path::Path;
 pub struct ComparsionSource {
     pub base_path: String,
@@ -69,6 +70,17 @@ impl ComparsionSource {
             return compare_result;
         }
     }
+
+    pub fn not_compared_list(&mut self) -> HashMap<String, &FileInfomation> {
+        let mut not_compared: HashMap<String, &FileInfomation> = HashMap::new();
+
+        for (key, item) in self.file_list.iter() {
+            if !item.compared {
+                not_compared.insert(key.to_string(), item);
+            }
+        }
+        return not_compared;
+    }
 }
 
 #[cfg(test)]
@@ -124,5 +136,7 @@ mod tests {
             format!("{:X}", hasher.finalize()),
         );
         assert_eq!(compare_result, true);
+        let not_compared_list = source_loader.not_compared_list();
+        assert_eq!(not_compared_list.len(), 2);
     }
 }
