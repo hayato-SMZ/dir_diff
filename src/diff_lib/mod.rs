@@ -1,2 +1,2 @@
-mod comparsion_source;
-mod file_infomation;
+pub mod comparsion_source;
+pub mod file_infomation;
