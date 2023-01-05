@@ -120,12 +120,12 @@ impl ComparsionSource {
         }
     }
 
-    pub fn not_compared_list(&mut self) -> HashMap<String, &FileInfomation> {
-        let mut not_compared: HashMap<String, &FileInfomation> = HashMap::new();
+    pub fn not_compared_list(&self) -> Vec<String> {
+        let mut not_compared: Vec<String> = Vec::new();
 
         for (key, item) in self.file_list.iter() {
             if !item.compared {
-                not_compared.insert(key.to_string(), item);
+                not_compared.push(item.path.clone());
             }
         }
         return not_compared;
@@ -140,8 +140,9 @@ impl ComparsionSource {
         current.push(filename);
         let mut file = File::create(&current).expect("out file open error");
         let mut out_info = String::new();
-        out_info = format!("base path: {}\ntarget path: {}\nbase file count: {}\ncompare count: {}\nerror count: {}\n", self.base_path, &target_path, self.file_list.len(), self.compare_count, self.compare_error.len());
-        out_info = format!("{}\nerrorList:\n\t{}",out_info, self.compare_error.join("\n\t") );
+        let not_compared_list = Self::not_compared_list(&self);
+        out_info = format!("base path: {}\ntarget path: {}\nbase file count: {}\ncompare count: {}\nerror count: {}\nFiles not compared: {}\n", self.base_path, &target_path, self.file_list.len(), self.compare_count, self.compare_error.len(), &not_compared_list.len());
+        out_info = format!("{}\nerrorList:\n\t{}\n\nnot compared:\n\t{}",out_info, self.compare_error.join("\n\t") ,not_compared_list.join("\n\t") );
         file.write_all(out_info.as_bytes());
         file.flush();
         println!("output result => {}", format!("{}", current.display()));
