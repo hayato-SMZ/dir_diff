@@ -8,5 +8,5 @@ This project is a CLI tool to compare files between directories
 
 # use
 ```
-dir_diff --source {Full path of the comparison source} --target {Full path of comparison destination}
+dir_diff --source {Full path of the comparison source} --target {Full path of comparison destination} --out {out file name (optional)}
 ```
