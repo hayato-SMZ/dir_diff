@@ -70,39 +70,12 @@ impl FileInfomation {
     pub fn compare(&mut self, target_file: String) -> bool {
         let full = Path::new(&target_file);
         let target_hash = format!("{:X}", Self::calculate_hash(&full));
-        // let mut file = match File::open(target_file) {
-        //     Ok(file) => file,
-        //     Err(why) => panic!("can't open {}", why),
-        // };
-
-        // let mut s = String::new();
-        // match file.read_to_string(&mut s) {
-        //     Err(why) => panic!("cant read {}", why),
-        //     Ok(file_str) => file_str,
-        // };
-        // let mut hasher = Sha256::new();
-        // hasher.update(s);
-        // let target_hash: String = format!("{:X}", hasher.finalize());
         if &target_hash == &self.file_hash {
             self.compared = true;
             return true;
         }
 
         return false;
-        // match filebinary {
-        //     Ok(filedata) => {
-        //         let mut hasher = Sha256::new();
-        //         hasher.update(filedata);
-        //         let target_hash: String = format!("{:X}", hasher.finalize());
-        //         if &target_hash == &self.file_hash {
-        //             self.compared = true;
-        //             return true;
-        //         } else {
-        //             return false;
-        //         }
-        //     }
-        //     Err(_) => return false,
-        // };
     }
 }
 

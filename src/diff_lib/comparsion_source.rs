@@ -2,14 +2,17 @@ use super::{file_infomation::FileInfomation, *};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::env;
+use std::fs::File;
 use std::fmt::format;
 use std::fs;
 use std::hash::Hash;
+use std::io::Write;
 use std::path::Path;
 pub struct ComparsionSource {
     pub base_path: String,
     pub file_list: HashMap<String, FileInfomation>,
     pub compare_error: Vec<String>,
+    pub compare_count: u32
 }
 
 impl Default for ComparsionSource {
@@ -18,6 +21,7 @@ impl Default for ComparsionSource {
             base_path: "".to_string(),
             file_list: HashMap::new(),
             compare_error: Vec::new(),
+            compare_count: 0
         }
     }
 }
@@ -66,6 +70,7 @@ impl ComparsionSource {
     }
 
     pub fn compare_start(&mut self, target_path: String) {
+        self.compare_count = 0;
         let path = Path::new(&target_path);
         Self::compare_dir(self, path, &target_path);
     }
@@ -80,8 +85,8 @@ impl ComparsionSource {
             } else {
                 let absolute_path = path.to_str().unwrap().replace(base_path, "");
                 let mut hasher = Sha256::new();
-                println!("absolute path => {}", absolute_path);
                 hasher.update(&absolute_path);
+                self.compare_count += 1;
                 if !Self::compare(
                     self,
                     path.to_str().unwrap().to_string(),
@@ -124,6 +129,22 @@ impl ComparsionSource {
             }
         }
         return not_compared;
+    }
+
+    pub fn result_output(self, out_file: String, target_path: String){
+        let mut current = match env::current_dir(){
+            Ok(path) => path,
+            Err(_) => panic!("out dir is not found"),
+        };
+        let filename = if out_file == "" {"diff_output.txt"} else {&out_file};
+        current.push(filename);
+        let mut file = File::create(&current).expect("out file open error");
+        let mut out_info = String::new();
+        out_info = format!("base path: {}\ntarget path: {}\nbase file count: {}\ncompare count: {}\nerror count: {}\n", self.base_path, &target_path, self.file_list.len(), self.compare_count, self.compare_error.len());
+        out_info = format!("{}\nerrorList:\n\t{}",out_info, self.compare_error.join("\n\t") );
+        file.write_all(out_info.as_bytes());
+        file.flush();
+        println!("output result => {}", format!("{}", current.display()));
     }
 }
 
@@ -172,7 +193,6 @@ mod tests {
             .unwrap()
             .replace(target.to_str().unwrap(), "");
         let mut hasher = Sha256::new();
-        println!("absolute path => {}", absolute_path);
         hasher.update(&absolute_path);
 
         let compare_result = source_loader.compare(
