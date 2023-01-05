@@ -170,7 +170,7 @@ mod tests {
         source_loader.read_base_path(target_path);
         let file_list = source_loader.file_list;
         println!("keys => {:?}", file_list.keys().len());
-        assert_eq!(file_list.keys().len(), 3);
+        assert_eq!(file_list.keys().len(), 4);
     }
 
     #[test]
@@ -202,6 +202,6 @@ mod tests {
         );
         assert_eq!(compare_result, true);
         let not_compared_list = source_loader.not_compared_list();
-        assert_eq!(not_compared_list.len(), 2);
+        assert_eq!(not_compared_list.len(), 3);
     }
 }
