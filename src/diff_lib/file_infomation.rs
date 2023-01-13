@@ -5,7 +5,7 @@ use std::fs::File;
 use std::hash::Hasher;
 use std::io::{BufReader, Read};
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 pub struct FileInfomation {
     pub path: String,
     pub full_path: String,
@@ -32,7 +32,7 @@ impl FileInfomation {
     }
 
     fn calculate_hash(file_path: &Path) -> u64 {
-        let mut file = match File::open(file_path) {
+        let file = match File::open(file_path) {
             Ok(file) => file,
             Err(why) => panic!("can't open {}", why),
         };
@@ -51,31 +51,30 @@ impl FileInfomation {
     pub fn set_path(&mut self, base_path: String, full_path: String) {
         self.full_path = full_path.clone();
         self.path = full_path.replace(&base_path, "");
-        let mut target_path = Path::new(&full_path);
+        let target_path = Path::new(&full_path);
 
-        self.file_hash = format!("{:X}", Self::calculate_hash(&target_path));
+        self.file_hash = format!("{:X}", Self::calculate_hash(target_path));
         let mut path_hasher = Sha256::new();
         path_hasher.update(&self.path);
         self.path_hash = format!("{:X}", path_hasher.finalize());
     }
 
-    pub fn get_path_hash(self) -> String {
-        return self.path_hash;
-    }
+    // pub fn get_path_hash(self) -> String {
+    //     return self.path_hash;
+    // }
 
-    pub fn get_path(self) -> String {
-        return self.path;
-    }
+    // pub fn get_path(self) -> String {
+    //     return self.path;
+    // }
 
     pub fn compare(&mut self, target_file: String) -> bool {
         let full = Path::new(&target_file);
-        let target_hash = format!("{:X}", Self::calculate_hash(&full));
+        let target_hash = format!("{:X}", Self::calculate_hash(full));
         self.compared = true;
-        if &target_hash == &self.file_hash {
+        if target_hash == self.file_hash {
             return true;
         }
-
-        return false;
+        false
     }
 }
 

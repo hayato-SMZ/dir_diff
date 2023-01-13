@@ -1,18 +1,17 @@
-use super::{file_infomation::FileInfomation, *};
+use super::file_infomation::FileInfomation;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::env;
-use std::fs::File;
-use std::fmt::format;
 use std::fs;
-use std::hash::Hash;
+use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+use std::thread;
 pub struct ComparsionSource {
     pub base_path: String,
     pub file_list: HashMap<String, FileInfomation>,
     pub compare_error: Vec<String>,
-    pub compare_count: u32
+    pub compare_count: u32,
 }
 
 impl Default for ComparsionSource {
@@ -21,7 +20,7 @@ impl Default for ComparsionSource {
             base_path: "".to_string(),
             file_list: HashMap::new(),
             compare_error: Vec::new(),
-            compare_count: 0
+            compare_count: 0,
         }
     }
 }
@@ -31,29 +30,35 @@ impl ComparsionSource {
         Default::default()
     }
 
-    pub fn set_base_path(&mut self, path: String) {
-        if Path::new(&path).exists() {
-            println!("path is exist");
-            self.base_path = path.clone();
-        } else {
-            println!("path is not exitst");
-            let mut current = match env::current_dir() {
-                Ok(path) => path,
-                Err(_) => panic!("current is not found"),
-            };
-            current.push(&path);
-            self.base_path = current.to_str().unwrap().to_string();
-        };
-    }
+    // pub fn set_base_path(&mut self, path: String) {
+    //     if Path::new(&path).exists() {
+    //         self.base_path = path.clone();
+    //     } else {
+    //         let mut current = match env::current_dir() {
+    //             Ok(path) => path,
+    //             Err(_) => panic!("current is not found"),
+    //         };
+    //         current.push(&path);
+    //         self.base_path = current.to_str().unwrap().to_string();
+    //     };
+    // }
 
     pub fn push_file_list(&mut self, file_path: &Path) {
         let mut file_items = FileInfomation::new();
-        file_items.set_path(
-            self.base_path.clone(),
-            file_path.to_str().unwrap().to_string(),
-        );
-        self.file_list
-            .insert(file_items.path_hash.clone(), file_items);
+        let base_path = self.base_path.clone();
+        let path = file_path.to_str().unwrap().to_string();
+        let handle = thread::spawn(move || {
+            file_items.set_path(base_path, path);
+            (file_items.path_hash.clone(), file_items)
+        });
+        let result = handle.join().unwrap();
+        self.file_list.insert(result.0, result.1);
+        // file_items.set_path(
+        //     self.base_path.clone(),
+        //     file_path.to_str().unwrap().to_string(),
+        // );
+        // self.file_list
+        //     .insert(file_items.path_hash.clone(), file_items);
     }
 
     pub fn read_target_directory(&mut self, dir_path: &Path) {
@@ -102,50 +107,60 @@ impl ComparsionSource {
         self.base_path = taraget_path.clone();
         let base = Path::new(&taraget_path);
         self.file_list = HashMap::new();
-        Self::read_target_directory(self, &base);
+
+        Self::read_target_directory(self, base);
     }
 
     pub fn compare(&mut self, target_path: String, target_hash: String) -> bool {
         if !self.file_list.contains_key(&target_hash) {
-            println!("notfound {}", target_hash);
-            println!("hashkey => {:?}", self.file_list.keys());
-            return false;
+            // println!("notfound {}", target_hash);
+            // println!("hashkey => {:?}", self.file_list.keys());
+            false
         } else {
             let compare_result = self
                 .file_list
                 .get_mut(&target_hash)
                 .unwrap()
                 .compare(target_path);
-            return compare_result;
+            compare_result
         }
     }
 
     pub fn not_compared_list(&self) -> Vec<String> {
         let mut not_compared: Vec<String> = Vec::new();
 
-        for (key, item) in self.file_list.iter() {
+        for (_, item) in self.file_list.iter() {
             if !item.compared {
                 not_compared.push(item.path.clone());
             }
         }
-        return not_compared;
+        not_compared
     }
 
-    pub fn result_output(self, out_file: String, target_path: String){
-        let mut current = match env::current_dir(){
+    pub fn result_output(self, out_file: String, target_path: String) {
+        let mut current = match env::current_dir() {
             Ok(path) => path,
             Err(_) => panic!("out dir is not found"),
         };
-        let filename = if out_file == "" {"diff_output.txt"} else {&out_file};
+        let filename = if out_file.is_empty() {
+            "diff_output.txt"
+        } else {
+            &out_file
+        };
         current.push(filename);
         let mut file = File::create(&current).expect("out file open error");
-        let mut out_info = String::new();
+        //  out_info = String::new();
         let not_compared_list = Self::not_compared_list(&self);
-        out_info = format!("base path: {}\ntarget path: {}\nbase file count: {}\ncompare count: {}\nerror count: {}\nFiles not compared: {}\n", self.base_path, &target_path, self.file_list.len(), self.compare_count, self.compare_error.len(), &not_compared_list.len());
-        out_info = format!("{}\nerrorList:\n\t{}\n\nnot compared:\n\t{}",out_info, self.compare_error.join("\n\t") ,not_compared_list.join("\n\t") );
-        file.write_all(out_info.as_bytes());
-        file.flush();
-        println!("output result => {}", format!("{}", current.display()));
+        let mut out_info: String = format!("base path: {}\ntarget path: {}\nbase file count: {}\ncompare count: {}\nerror count: {}\nFiles not compared: {}\n", self.base_path, &target_path, self.file_list.len(), self.compare_count, self.compare_error.len(), &not_compared_list.len());
+        out_info = format!(
+            "{}\nerrorList:\n\t{}\n\nnot compared:\n\t{}",
+            out_info,
+            self.compare_error.join("\n\t"),
+            not_compared_list.join("\n\t")
+        );
+        file.write_all(out_info.as_bytes()).expect("write error");
+        file.flush().expect("flush error");
+        println!("output result => {}", current.display());
     }
 }
 
@@ -154,7 +169,6 @@ mod tests {
     use crate::diff_lib;
     use sha2::{Digest, Sha256};
     use std::env;
-    use std::path::Path;
 
     #[test]
     fn test_read_target() {
