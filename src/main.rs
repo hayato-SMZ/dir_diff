@@ -18,7 +18,6 @@ fn main() {
     let mut source = diff_lib::comparsion_source::ComparsionSource::new();
     println!("read base path....");
     source.read_base_path(args.source);
-
     println!("compare ....");
     source.compare_start(args.target.clone());
     println!("compare end");

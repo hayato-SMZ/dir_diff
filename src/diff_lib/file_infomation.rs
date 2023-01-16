@@ -31,51 +31,49 @@ impl FileInfomation {
         Default::default()
     }
 
-    fn calculate_hash(file_path: &Path) -> u64 {
-        let file = match File::open(file_path) {
-            Ok(file) => file,
-            Err(why) => panic!("can't open {}", why),
-        };
-        let mut reader = BufReader::new(file);
-        let mut hasher = DefaultHasher::new();
-        let mut buffer = [0; 1024];
-        while let Ok(n) = reader.read(&mut buffer) {
-            hasher.write(&buffer);
-            if n == 0 {
-                break;
-            }
-        }
-        hasher.finish()
-    }
-
-    pub fn set_path(&mut self, base_path: String, full_path: String) {
-        self.full_path = full_path.clone();
+    pub fn set_path(&mut self, base_path: String, full_path: &str) {
+        self.full_path = full_path.to_string();
         self.path = full_path.replace(&base_path, "");
-        let target_path = Path::new(&full_path);
-
-        self.file_hash = format!("{:X}", Self::calculate_hash(target_path));
         let mut path_hasher = Sha256::new();
         path_hasher.update(&self.path);
         self.path_hash = format!("{:X}", path_hasher.finalize());
     }
 
-    // pub fn get_path_hash(self) -> String {
-    //     return self.path_hash;
-    // }
+    pub fn set_file_hash(&mut self, hash: String) {
+        self.file_hash = hash;
+        // let target_path = Path::new(&self.full_path);
+        // self.file_hash = format!("{:X}", Self::calculate_hash(target_path));
+    }
 
-    // pub fn get_path(self) -> String {
-    //     return self.path;
-    // }
+    pub fn compare(&mut self, target_hash: String) -> bool {
+        // let full = Path::new(&target_file);
+        // let target_hash = format!("{:X}", Self::calculate_hash(full));
 
-    pub fn compare(&mut self, target_file: String) -> bool {
-        let full = Path::new(&target_file);
-        let target_hash = format!("{:X}", Self::calculate_hash(full));
         self.compared = true;
         if target_hash == self.file_hash {
             return true;
         }
         false
     }
+}
+
+pub fn calculate_hash(path_string: &String) -> String {
+    //u64 {
+    let file_path = Path::new(path_string);
+    let file = match File::open(file_path) {
+        Ok(file) => file,
+        Err(why) => panic!("can't open {}", why),
+    };
+    let mut reader = BufReader::new(file);
+    let mut hasher = DefaultHasher::new();
+    let mut buffer = [0; 1024];
+    while let Ok(n) = reader.read(&mut buffer) {
+        hasher.write(&buffer);
+        if n == 0 {
+            break;
+        }
+    }
+    format!("{:X}", hasher.finish())
 }
 
 #[cfg(test)]
@@ -95,7 +93,7 @@ mod tests {
         current_file.push("test.txt");
         info.set_path(
             format!("{}", current.display()),
-            format!("{}", current_file.display()),
+            &format!("{}", current_file.display()),
         );
         assert_eq!(info.path, "/test.txt");
         println!("filehash => {}", info.file_hash);
@@ -121,7 +119,7 @@ mod tests {
         println!("error  =>   {}", current_file.display());
         info.set_path(
             format!("{}", current_dir.display()),
-            format!("{}", current_file.display()),
+            &format!("{}", current_file.display()),
         );
 
         assert_eq!(info.compare(format!("{}", target_file.display())), true);
