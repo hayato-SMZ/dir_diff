@@ -48,7 +48,6 @@ impl FileInfomation {
     pub fn compare(&mut self, target_hash: String) -> bool {
         // let full = Path::new(&target_file);
         // let target_hash = format!("{:X}", Self::calculate_hash(full));
-
         self.compared = true;
         if target_hash == self.file_hash {
             return true;

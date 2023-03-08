@@ -103,7 +103,8 @@ impl ComparsionSource {
     }
 
     pub fn read_base_path(&mut self, taraget_path: String) {
-        self.base_path = taraget_path.clone();
+        Self::set_base_path(self, taraget_path.clone());
+        // self.base_path = taraget_path.clone();
         let base = Path::new(&taraget_path);
         self.file_list = HashMap::new();
 
