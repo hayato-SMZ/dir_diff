@@ -96,7 +96,9 @@ mod tests {
         );
         assert_eq!(info.path, "/test.txt");
         println!("filehash => {}", info.file_hash);
-        assert_eq!(info.file_hash, "74EF815FC37249A1");
+        assert_eq!(info.file_hash, "");
+        let file_hash = diff_lib::file_infomation::calculate_hash(&format!("{}", current_file.display()));
+        assert_eq!(file_hash, "74EF815FC37249A1");
     }
 
     #[test]
@@ -120,9 +122,10 @@ mod tests {
             format!("{}", current_dir.display()),
             &format!("{}", current_file.display()),
         );
+        let file_hash = diff_lib::file_infomation::calculate_hash(&format!("{}", current_file.display()));
+        info.set_file_hash(file_hash);
+        assert_eq!(info.compare(diff_lib::file_infomation::calculate_hash(&format!("{}", target_file.display()))), true);
 
-        assert_eq!(info.compare(format!("{}", target_file.display())), true);
-
-        assert_eq!(info.compare(format!("{}", error_file.display())), false);
+        assert_eq!(info.compare(diff_lib::file_infomation::calculate_hash(&format!("{}", error_file.display()))), false);
     }
 }
