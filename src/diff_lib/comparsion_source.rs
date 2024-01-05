@@ -9,6 +9,7 @@ use std::io::Write;
 use std::path::Path;
 use std::thread;
 use std::time::Instant;
+use tokio::task;
 pub struct ComparsionSource {
     pub base_path: String,
     pub file_list: HashMap<String, FileInfomation>,
@@ -36,16 +37,23 @@ impl ComparsionSource {
         Default::default()
     }
 
-    pub fn push_file_list(&mut self, file_path: &Path) {
+    pub async fn push_file_list(&mut self, file_path: &Path) {
         let mut file_items = FileInfomation::new();
         let base_path = self.base_path.clone();
         let path = file_path.to_str().unwrap().to_string();
-        let handle = thread::spawn(move || {
+        // let handle = thread::spawn(move || {
+        //     file_items.set_path(base_path, &path);
+        //     file_items.set_file_hash(file_infomation::calculate_hash(&path));
+        //     (file_items.path_hash.clone(), file_items)
+        // });
+        // let result = handle.join().unwrap();
+        let result = task::spawn(async move {
             file_items.set_path(base_path, &path);
             file_items.set_file_hash(file_infomation::calculate_hash(&path));
             (file_items.path_hash.clone(), file_items)
-        });
-        let result = handle.join().unwrap();
+        })
+        .await
+        .unwrap();
         self.file_list.insert(result.0, result.1);
     }
 
