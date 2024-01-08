@@ -37,10 +37,9 @@ impl ComparsionSource {
         Default::default()
     }
 
-    pub async fn push_file_list(&mut self, file_path: &Path) {
-        let mut file_items = FileInfomation::new();
-        let base_path = self.base_path.clone();
-        let path = file_path.to_str().unwrap().to_string();
+    pub async fn push_file_list(&mut self, mut file_items: FileInfomation) -> FileInfomation {
+        // let base_path = self.base_path.clone();
+        // let path = file_path.to_str().unwrap().to_string();
         // let handle = thread::spawn(move || {
         //     file_items.set_path(base_path, &path);
         //     file_items.set_file_hash(file_infomation::calculate_hash(&path));
@@ -48,13 +47,13 @@ impl ComparsionSource {
         // });
         // let result = handle.join().unwrap();
         let result = task::spawn(async move {
-            file_items.set_path(base_path, &path);
-            file_items.set_file_hash(file_infomation::calculate_hash(&path));
+            // file_items.set_path(&base_path, &path);
+            file_items.set_file_hash(file_infomation::calculate_hash(&file_items.full_path));
             (file_items.path_hash.clone(), file_items)
         })
         .await
         .unwrap();
-        self.file_list.insert(result.0, result.1);
+        return result.1;
     }
 
     pub fn read_target_directory(&mut self, dir_path: &Path) {
@@ -63,9 +62,14 @@ impl ComparsionSource {
             let child = child.expect("Dir Entry error");
             let path = child.path();
             if path.is_dir() {
-                Self::read_target_directory(self, &path);
+                self.read_target_directory(&path);
+                // Self::read_target_directory(self, &path);
             } else {
-                Self::push_file_list(self, &path);
+                let mut file_item = FileInfomation::new();
+                file_item.set_path(&self.base_path, &path.to_str().unwrap());
+                self.file_list
+                    .insert(file_item.path_hash.clone(), file_item);
+                // Self::push_file_list(self, &path);
             }
         }
     }
@@ -110,13 +114,39 @@ impl ComparsionSource {
         }
     }
 
-    pub fn read_base_path(&mut self, taraget_path: String) {
+    pub async fn read_base_path(&mut self, taraget_path: String) {
         // Self::set_base_path(self, taraget_path.clone());
         self.base_path = taraget_path.clone();
         let base = Path::new(&taraget_path);
         self.file_list = HashMap::new();
-
         Self::read_target_directory(self, base);
+        // file_listのループを回して、hashを計算する
+        self.calculate_hashes().await;
+    }
+
+    pub async fn calculate_hashes(&mut self) {
+        let mut tasks = Vec::new();
+
+        for (_, item) in self.file_list.iter_mut() {
+            let full_path = item.full_path.clone();
+            let key = item.path_hash.clone();
+            let task = task::spawn(async move {
+                let hash = file_infomation::calculate_hash(&full_path);
+                (key, hash)
+            });
+            tasks.push(task);
+        }
+
+        let results = futures::future::join_all(tasks).await;
+
+        for result in results {
+            if let Ok((key, hash)) = result {
+                self.file_list
+                    .get_mut(key.as_str())
+                    .unwrap()
+                    .set_file_hash(hash);
+            }
+        }
     }
 
     pub fn compare(&mut self, target_path: String, target_hash: String) -> Result<bool, i16> {
@@ -126,14 +156,15 @@ impl ComparsionSource {
             // false
             Err(-1)
         } else {
-            let handle = thread::spawn(move || file_infomation::calculate_hash(&target_path));
+            let handle = file_infomation::calculate_hash(&target_path);
 
+            println!("compare => {}", handle);
             // let target_hash = ;
             let compare_result = self
                 .file_list
                 .get_mut(&target_hash)
                 .unwrap()
-                .compare(handle.join().unwrap());
+                .compare(handle);
             if compare_result {
                 Ok(true)
             } else {
@@ -190,8 +221,8 @@ mod tests {
     use sha2::{Digest, Sha256};
     use std::env;
 
-    #[test]
-    fn test_read_target() {
+    #[tokio::test]
+    async fn test_read_target() {
         let mut current = match env::current_dir() {
             Ok(path) => path,
             Err(_) => panic!("current is not found"),
@@ -201,14 +232,14 @@ mod tests {
         let mut source_loader = diff_lib::comparsion_source::ComparsionSource::new();
         let target_path: String = format!("{}", current.display());
         println!("target => {}", &target_path);
-        source_loader.read_base_path(target_path);
+        source_loader.read_base_path(target_path).await;
         let file_list = source_loader.file_list;
         println!("keys => {:?}", file_list.keys().len());
         assert_eq!(file_list.keys().len(), 4);
     }
 
-    #[test]
-    fn test_compare() {
+    #[tokio::test]
+    async fn test_compare() {
         let mut current = match env::current_dir() {
             Ok(path) => path,
             Err(_) => panic!("current is not found"),
@@ -218,7 +249,7 @@ mod tests {
         current.push("source");
         let mut source_loader = diff_lib::comparsion_source::ComparsionSource::new();
         let target_path: String = format!("{}", current.display());
-        source_loader.read_base_path(target_path);
+        source_loader.read_base_path(target_path).await;
 
         target.push("target");
         let mut target_file_path = target.clone();

@@ -31,9 +31,9 @@ impl FileInfomation {
         Default::default()
     }
 
-    pub fn set_path(&mut self, base_path: String, full_path: &str) {
+    pub fn set_path(&mut self, base_path: &String, full_path: &str) {
         self.full_path = full_path.to_string();
-        self.path = full_path.replace(&base_path, "");
+        self.path = full_path.replace(base_path, "");
         let mut path_hasher = Sha256::new();
         path_hasher.update(&self.path);
         self.path_hash = format!("{:X}", path_hasher.finalize());
@@ -49,6 +49,7 @@ impl FileInfomation {
         // let full = Path::new(&target_file);
         // let target_hash = format!("{:X}", Self::calculate_hash(full));
         self.compared = true;
+        println!("{} => {}", self.path, self.file_hash);
         if target_hash == self.file_hash {
             return true;
         }
@@ -91,13 +92,14 @@ mod tests {
         let mut current_file = current.clone();
         current_file.push("test.txt");
         info.set_path(
-            format!("{}", current.display()),
+            &format!("{}", current.display()),
             &format!("{}", current_file.display()),
         );
-        assert_eq!(info.path, "/test.txt");
+        assert_eq!(info.path, "\\test.txt");
         println!("filehash => {}", info.file_hash);
         assert_eq!(info.file_hash, "");
-        let file_hash = diff_lib::file_infomation::calculate_hash(&format!("{}", current_file.display()));
+        let file_hash =
+            diff_lib::file_infomation::calculate_hash(&format!("{}", current_file.display()));
         assert_eq!(file_hash, "74EF815FC37249A1");
     }
 
@@ -119,13 +121,26 @@ mod tests {
         error_file.push("target/word_sample.docx");
         println!("error  =>   {}", current_file.display());
         info.set_path(
-            format!("{}", current_dir.display()),
+            &format!("{}", current_dir.display()),
             &format!("{}", current_file.display()),
         );
-        let file_hash = diff_lib::file_infomation::calculate_hash(&format!("{}", current_file.display()));
+        let file_hash =
+            diff_lib::file_infomation::calculate_hash(&format!("{}", current_file.display()));
         info.set_file_hash(file_hash);
-        assert_eq!(info.compare(diff_lib::file_infomation::calculate_hash(&format!("{}", target_file.display()))), true);
+        assert_eq!(
+            info.compare(diff_lib::file_infomation::calculate_hash(&format!(
+                "{}",
+                target_file.display()
+            ))),
+            true
+        );
 
-        assert_eq!(info.compare(diff_lib::file_infomation::calculate_hash(&format!("{}", error_file.display()))), false);
+        assert_eq!(
+            info.compare(diff_lib::file_infomation::calculate_hash(&format!(
+                "{}",
+                error_file.display()
+            ))),
+            false
+        );
     }
 }

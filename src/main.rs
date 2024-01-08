@@ -13,11 +13,13 @@ struct Args {
     #[arg(short, long, default_value = "")]
     out: String,
 }
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
     let mut source = diff_lib::comparsion_source::ComparsionSource::new();
     println!("read base path....");
-    source.read_base_path(args.source);
+    source.read_base_path(args.source).await;
+
     println!("compare ....");
     source.compare_start(args.target.clone());
     println!("compare end");
