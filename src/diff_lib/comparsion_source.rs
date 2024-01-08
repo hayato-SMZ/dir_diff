@@ -7,7 +7,6 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use std::thread;
 use std::time::Instant;
 use tokio::task;
 pub struct ComparsionSource {
@@ -37,24 +36,24 @@ impl ComparsionSource {
         Default::default()
     }
 
-    pub async fn push_file_list(&mut self, mut file_items: FileInfomation) -> FileInfomation {
-        // let base_path = self.base_path.clone();
-        // let path = file_path.to_str().unwrap().to_string();
-        // let handle = thread::spawn(move || {
-        //     file_items.set_path(base_path, &path);
-        //     file_items.set_file_hash(file_infomation::calculate_hash(&path));
-        //     (file_items.path_hash.clone(), file_items)
-        // });
-        // let result = handle.join().unwrap();
-        let result = task::spawn(async move {
-            // file_items.set_path(&base_path, &path);
-            file_items.set_file_hash(file_infomation::calculate_hash(&file_items.full_path));
-            (file_items.path_hash.clone(), file_items)
-        })
-        .await
-        .unwrap();
-        return result.1;
-    }
+    // pub async fn push_file_list(&mut self, mut file_items: FileInfomation) -> FileInfomation {
+    //     // let base_path = self.base_path.clone();
+    //     // let path = file_path.to_str().unwrap().to_string();
+    //     // let handle = thread::spawn(move || {
+    //     //     file_items.set_path(base_path, &path);
+    //     //     file_items.set_file_hash(file_infomation::calculate_hash(&path));
+    //     //     (file_items.path_hash.clone(), file_items)
+    //     // });
+    //     // let result = handle.join().unwrap();
+    //     let result = task::spawn(async move {
+    //         // file_items.set_path(&base_path, &path);
+    //         file_items.set_file_hash(file_infomation::calculate_hash(&file_items.full_path));
+    //         (file_items.path_hash.clone(), file_items)
+    //     })
+    //     .await
+    //     .unwrap();
+    //     return result.1;
+    // }
 
     pub fn read_target_directory(&mut self, dir_path: &Path) {
         let children = fs::read_dir(dir_path).expect("dir Load Error");
