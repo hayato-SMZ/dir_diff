@@ -118,7 +118,9 @@ impl ComparsionSource {
         self.base_path = taraget_path.clone();
         let base = Path::new(&taraget_path);
         self.file_list = HashMap::new();
+        println!("read target directory....");
         Self::read_target_directory(self, base);
+        println!("calculate hash....");
         // file_listのループを回して、hashを計算する
         self.calculate_hashes().await;
     }
@@ -156,8 +158,6 @@ impl ComparsionSource {
             Err(-1)
         } else {
             let handle = file_infomation::calculate_hash(&target_path);
-
-            println!("compare => {}", handle);
             // let target_hash = ;
             let compare_result = self
                 .file_list
@@ -230,10 +230,8 @@ mod tests {
         current.push("source");
         let mut source_loader = diff_lib::comparsion_source::ComparsionSource::new();
         let target_path: String = format!("{}", current.display());
-        println!("target => {}", &target_path);
         source_loader.read_base_path(target_path).await;
         let file_list = source_loader.file_list;
-        println!("keys => {:?}", file_list.keys().len());
         assert_eq!(file_list.keys().len(), 4);
     }
 

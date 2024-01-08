@@ -49,7 +49,6 @@ impl FileInfomation {
         // let full = Path::new(&target_file);
         // let target_hash = format!("{:X}", Self::calculate_hash(full));
         self.compared = true;
-        println!("{} => {}", self.path, self.file_hash);
         if target_hash == self.file_hash {
             return true;
         }
@@ -96,7 +95,6 @@ mod tests {
             &format!("{}", current_file.display()),
         );
         assert_eq!(info.path, "\\test.txt");
-        println!("filehash => {}", info.file_hash);
         assert_eq!(info.file_hash, "");
         let file_hash =
             diff_lib::file_infomation::calculate_hash(&format!("{}", current_file.display()));
