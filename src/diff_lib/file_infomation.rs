@@ -94,7 +94,7 @@ mod tests {
             &format!("{}", current.display()),
             &format!("{}", current_file.display()),
         );
-        assert_eq!(info.path, "\\test.txt");
+        assert_eq!(info.path, "/test.txt");
         assert_eq!(info.file_hash, "");
         let file_hash =
             diff_lib::file_infomation::calculate_hash(&format!("{}", current_file.display()));
