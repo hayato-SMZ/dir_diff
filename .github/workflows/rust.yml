@@ -2,7 +2,7 @@ name: Rust
 
 on:
   push:
-    branches: [ "release-**" ]
+    tags: ["release-**"]
 
 env:
   CARGO_TERM_COLOR: always
@@ -11,38 +11,38 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: Run tests
-      run: cargo test --verbose
-    - name: Compile and Release
-      id: compile
-      uses: rust-build/rust-build.action@v1.4.0
-      env:
-        GITHUB_TOKEN: ${{secrets.TOKEN}}
-      with:
-        RUSTTARGET: x86_64-pc-windows-gnu
-        UPLOAD_MODE: none
-        ARCHIVE_TYPE: zip 
-    - name: create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{secrets.TOKEN}}
-      with:
-        tag_name: ${{github.ref}}
-        release_name: Release ${{github.ref}}
-        draft: false
-        prerelease: false
-    - name: upload_url
-      id: upload_url
-      run: |
-        echo ${{steps.create_release.outputs.upload_url}}
-    - name: UploadRelease
-      uses: actions/upload-release-asset@v1
-      env: 
-        GITHUB_TOKEN: ${{secrets.TOKEN}}
-      with:
-        upload_url: ${{steps.create_release.outputs.upload_url}}
-        asset_path: ${{steps.compile.outputs.BUILT_ARCHIVE}}
-        asset_name: release.zip
-        asset_content_type: application/zip
+      - uses: actions/checkout@v3
+      - name: Run tests
+        run: cargo test --verbose
+      - name: Compile and Release
+        id: compile
+        uses: rust-build/rust-build.action@v1.4.0
+        env:
+          GITHUB_TOKEN: ${{secrets.TOKEN}}
+        with:
+          RUSTTARGET: x86_64-pc-windows-gnu
+          UPLOAD_MODE: none
+          ARCHIVE_TYPE: zip
+      - name: create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{secrets.TOKEN}}
+        with:
+          tag_name: ${{github.ref}}
+          release_name: Release ${{github.ref}}
+          draft: false
+          prerelease: false
+      - name: upload_url
+        id: upload_url
+        run: |
+          echo ${{steps.create_release.outputs.upload_url}}
+      - name: UploadRelease
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{secrets.TOKEN}}
+        with:
+          upload_url: ${{steps.create_release.outputs.upload_url}}
+          asset_path: ${{steps.compile.outputs.BUILT_ARCHIVE}}
+          asset_name: release.zip
+          asset_content_type: application/zip
