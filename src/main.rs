@@ -21,7 +21,7 @@ async fn main() {
     source.read_base_path(args.source).await;
 
     println!("compare ....");
-    source.compare_start(args.target.clone());
+    source.compare_start(args.target.clone()).await;
     println!("compare end");
     source.result_output(args.out, args.target);
 }

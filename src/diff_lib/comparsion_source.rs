@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::fs::File;
+use std::hash;
 use std::io::Write;
 use std::path::Path;
 use std::time::Instant;
@@ -12,6 +13,7 @@ use tokio::task;
 pub struct ComparsionSource {
     pub base_path: String,
     pub file_list: HashMap<String, FileInfomation>,
+    pub compare_files: Vec<String>,
     pub compare_error: Vec<String>,
     pub notfound_error: Vec<String>,
     pub compare_count: u32,
@@ -23,6 +25,7 @@ impl Default for ComparsionSource {
         Self {
             base_path: "".to_string(),
             file_list: HashMap::new(),
+            compare_files: Vec::new(),
             compare_error: Vec::new(),
             notfound_error: Vec::new(),
             compare_count: 0,
@@ -35,25 +38,6 @@ impl ComparsionSource {
     pub fn new() -> ComparsionSource {
         Default::default()
     }
-
-    // pub async fn push_file_list(&mut self, mut file_items: FileInfomation) -> FileInfomation {
-    //     // let base_path = self.base_path.clone();
-    //     // let path = file_path.to_str().unwrap().to_string();
-    //     // let handle = thread::spawn(move || {
-    //     //     file_items.set_path(base_path, &path);
-    //     //     file_items.set_file_hash(file_infomation::calculate_hash(&path));
-    //     //     (file_items.path_hash.clone(), file_items)
-    //     // });
-    //     // let result = handle.join().unwrap();
-    //     let result = task::spawn(async move {
-    //         // file_items.set_path(&base_path, &path);
-    //         file_items.set_file_hash(file_infomation::calculate_hash(&file_items.full_path));
-    //         (file_items.path_hash.clone(), file_items)
-    //     })
-    //     .await
-    //     .unwrap();
-    //     return result.1;
-    // }
 
     pub fn read_target_directory(&mut self, dir_path: &Path) {
         let children = fs::read_dir(dir_path).expect("dir Load Error");
@@ -73,11 +57,93 @@ impl ComparsionSource {
         }
     }
 
-    pub fn compare_start(&mut self, target_path: String) {
+    pub async fn compare_start(&mut self, target_path: String) {
         self.compare_count = 0;
         let path = Path::new(&target_path);
-        Self::compare_dir(self, path, &target_path);
+        self.read_compare_dir_path(path);
+        Self::compare_hashes(self, &target_path).await;
     }
+
+    // compare_filesのpathのハッシュ化と、該当のファイルのハッシュ化を行う
+    pub async fn compare_hashes(&mut self, base_path: &String) {
+        let mut tasks = Vec::new();
+
+        for item in self.compare_files.iter_mut() {
+            let full_path = item.clone();
+            let base = base_path.clone();
+            let task = task::spawn(async move {
+                let absolute_path = full_path.replace(&base, "");
+                let mut hasher = Sha256::new();
+                hasher.update(&absolute_path);
+                let path_hash: String = format!("{:X}", hasher.finalize());
+                let hash = file_infomation::calculate_hash(&full_path);
+                (absolute_path, path_hash, hash)
+            });
+            tasks.push(task);
+        }
+
+        let results = futures::future::join_all(tasks).await;
+
+        for result in results {
+            if let Ok((absolute_path, path_hash, hash)) = result {
+                if self.file_list.contains_key(&path_hash) {
+                    let compare_result = self.file_list.get_mut(&path_hash).unwrap().compare(hash);
+                    if !compare_result {
+                        self.compare_error.push(absolute_path);
+                    }
+                } else {
+                    self.notfound_error.push(absolute_path);
+                }
+            }
+        }
+    }
+
+    pub fn read_compare_dir_path(&mut self, target_path: &Path) {
+        let children = fs::read_dir(target_path).expect("compare dir read error");
+        for child in children {
+            let child = child.expect("dir entry error");
+            let path = child.path();
+            if path.is_dir() {
+                Self::read_compare_dir_path(self, &path);
+            } else {
+                self.compare_files.push(path.to_str().unwrap().to_string());
+            }
+        }
+    }
+
+    // pub async fn compare_dir(&mut self, target_path: &Path, base_path: &String) {
+    //     let mut tasks = Vec::new();
+    //     for child in self.co {
+    //         let child = child.expect("dir entry error");
+    //         let path = child.path();
+    //         if path.is_dir() {
+    //             let task = task::spawn(async move {
+    //                 Self::compare_dir(self, &path, base_path).await;
+    //             });
+    //             tasks.push(task);
+    //         } else {
+    //             let absolute_path = path.to_str().unwrap().replace(base_path, "");
+    //             let mut hasher = Sha256::new();
+    //             hasher.update(&absolute_path);
+    //             self.compare_count += 1;
+    //             let task = task::spawn(async move {
+    //                 if let Err(x) = Self::compare(
+    //                     self,
+    //                     path.to_str().unwrap().to_string(),
+    //                     format!("{:X}", hasher.finalize()),
+    //                 ) {
+    //                     if x == -1 {
+    //                         self.notfound_error.push(absolute_path);
+    //                     } else {
+    //                         self.compare_error.push(absolute_path);
+    //                     }
+    //                 }
+    //             });
+    //             tasks.push(task);
+    //         }
+    //     }
+    //     futures::future::join_all(tasks).await;
+    // }
 
     pub fn compare_dir(&mut self, target_path: &Path, base_path: &String) {
         let children = fs::read_dir(target_path).expect("compare dir read error");
@@ -102,13 +168,6 @@ impl ComparsionSource {
                         self.compare_error.push(absolute_path);
                     }
                 }
-                // if !Self::compare(
-                //     self,
-                //     path.to_str().unwrap().to_string(),
-                //     format!("{:X}", hasher.finalize()),
-                // ) {
-                //     self.compare_error.push(absolute_path);
-                // }
             }
         }
     }
