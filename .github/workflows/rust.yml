@@ -2,7 +2,7 @@ name: Rust
 
 on:
   push:
-    tags: ["refs/**"]
+    tags: ["rel-**"]
 
 env:
   CARGO_TERM_COLOR: always
