@@ -18,6 +18,7 @@ pub struct ComparsionSource {
     pub notfound_error: Vec<String>,
     pub compare_count: u32,
     pub start_time: Instant,
+    pub multi_thread_enabled: bool,
 }
 
 impl Default for ComparsionSource {
@@ -30,6 +31,7 @@ impl Default for ComparsionSource {
             notfound_error: Vec::new(),
             compare_count: 0,
             start_time: Instant::now(),
+            multi_thread_enabled: false,
         }
     }
 }
@@ -37,6 +39,13 @@ impl Default for ComparsionSource {
 impl ComparsionSource {
     pub fn new() -> ComparsionSource {
         Default::default()
+    }
+
+    pub fn new_with_mode(multi_thread_enabled: bool) -> ComparsionSource {
+        ComparsionSource {
+            multi_thread_enabled,
+            ..Default::default()
+        }
     }
 
     pub fn read_target_directory(&mut self, dir_path: &Path) {
@@ -61,7 +70,13 @@ impl ComparsionSource {
         self.compare_count = 0;
         let path = Path::new(&target_path);
         self.read_compare_dir_path(path);
-        Self::compare_hashes(self, &target_path).await;
+        if self.multi_thread_enabled {
+            println!("Using multi-thread mode for comparison");
+            Self::compare_hashes(self, &target_path).await;
+        } else {
+            println!("Using single-thread mode for comparison");
+            self.compare_hashes_single(&target_path);
+        }
     }
 
     // compare_filesのpathのハッシュ化と、該当のファイルのハッシュ化を行う
@@ -94,6 +109,26 @@ impl ComparsionSource {
                 } else {
                     self.notfound_error.push(absolute_path);
                 }
+            }
+        }
+    }
+
+    pub fn compare_hashes_single(&mut self, base_path: &String) {
+        for item in self.compare_files.iter() {
+            let full_path = item.clone();
+            let absolute_path = full_path.replace(base_path, "");
+            let mut hasher = Sha256::new();
+            hasher.update(&absolute_path);
+            let path_hash: String = format!("{:X}", hasher.finalize());
+            let hash = file_infomation::calculate_hash(&full_path);
+
+            if self.file_list.contains_key(&path_hash) {
+                let compare_result = self.file_list.get_mut(&path_hash).unwrap().compare(hash);
+                if !compare_result {
+                    self.compare_error.push(absolute_path);
+                }
+            } else {
+                self.notfound_error.push(absolute_path);
             }
         }
     }
@@ -181,7 +216,13 @@ impl ComparsionSource {
         Self::read_target_directory(self, base);
         println!("calculate hash....");
         // file_listのループを回して、hashを計算する
-        self.calculate_hashes().await;
+        if self.multi_thread_enabled {
+            println!("Using multi-thread mode for hash calculation");
+            self.calculate_hashes().await;
+        } else {
+            println!("Using single-thread mode for hash calculation");
+            self.calculate_hashes_single();
+        }
     }
 
     pub async fn calculate_hashes(&mut self) {
@@ -206,6 +247,13 @@ impl ComparsionSource {
                     .unwrap()
                     .set_file_hash(hash);
             }
+        }
+    }
+
+    pub fn calculate_hashes_single(&mut self) {
+        for (_, item) in self.file_list.iter_mut() {
+            let hash = file_infomation::calculate_hash(&item.full_path);
+            item.set_file_hash(hash);
         }
     }
 
@@ -324,5 +372,59 @@ mod tests {
         assert_eq!(compare_result, Ok(true));
         let not_compared_list = source_loader.not_compared_list();
         assert_eq!(not_compared_list.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_single_thread_mode() {
+        let mut current = match env::current_dir() {
+            Ok(path) => path,
+            Err(_) => panic!("current is not found"),
+        };
+        current.push("test");
+        current.push("source");
+        let mut source_loader = diff_lib::comparsion_source::ComparsionSource::new_with_mode(false);
+        let target_path: String = format!("{}", current.display());
+        source_loader.read_base_path(target_path).await;
+        let file_list = source_loader.file_list;
+        assert_eq!(file_list.keys().len(), 4);
+        assert_eq!(source_loader.multi_thread_enabled, false);
+    }
+
+    #[tokio::test]
+    async fn test_multi_thread_mode() {
+        let mut current = match env::current_dir() {
+            Ok(path) => path,
+            Err(_) => panic!("current is not found"),
+        };
+        current.push("test");
+        current.push("source");
+        let mut source_loader = diff_lib::comparsion_source::ComparsionSource::new_with_mode(true);
+        let target_path: String = format!("{}", current.display());
+        source_loader.read_base_path(target_path).await;
+        let file_list = source_loader.file_list;
+        assert_eq!(file_list.keys().len(), 4);
+        assert_eq!(source_loader.multi_thread_enabled, true);
+    }
+
+    #[tokio::test]
+    async fn test_single_thread_compare() {
+        let mut current = match env::current_dir() {
+            Ok(path) => path,
+            Err(_) => panic!("current is not found"),
+        };
+        current.push("test");
+        let mut target = current.clone();
+        current.push("source");
+        let mut source_loader = diff_lib::comparsion_source::ComparsionSource::new_with_mode(false);
+        let target_path: String = format!("{}", current.display());
+        source_loader.read_base_path(target_path).await;
+
+        target.push("target");
+        let target_path_str: String = format!("{}", target.display());
+        source_loader.compare_start(target_path_str).await;
+        
+        // シングルスレッドモードでも正常に比較処理が完了することを確認
+        assert_eq!(source_loader.multi_thread_enabled, false);
+        assert!(source_loader.compare_files.len() > 0);
     }
 }
